@@ -120,6 +120,17 @@ describe('IntlMessageFormat', function () {
             expect(output).to.equal('I am 0 years old.');
         });
 
+        it('should stringify objects', function() {
+            var mf = new IntlMessageFormat('My favorite thing is {object}');
+            var output = mf.format({
+                object: {
+                  type: "SHINY"
+                }
+            });
+
+            expect(output).to.equal('My favorite thing is [object Object]');
+        });
+
         it('should ignore false, null, and undefined', function() {
             var mf = new IntlMessageFormat('{a}{b}{c}');
             var output = mf.format({
@@ -400,6 +411,144 @@ describe('IntlMessageFormat', function () {
 
             expect(pt.format({num: 0})).to.equal('one');
             expect(ptMZ.format({num: 0})).to.equal('other');
+        });
+    });
+
+    describe('tags', function () {
+        it('should invoke the tagElement function with the content', function () {
+            var mf = new IntlMessageFormat("<0>Hello</0>");
+
+            var calls = [];
+            var printer = function (content) {
+                calls.push(arguments);
+                return ">>> " + content + " <<<";
+            };
+
+            var result = mf.format({0: printer});
+
+            expect(calls).to.have.length(1);
+            expect(calls[0]).to.have.length(1);
+            expect(calls[0][0]).to.eql(["Hello"]);
+            expect(result).to.equal(">>> Hello <<<");
+        });
+
+        it('should invoke the selfClosingTagElement function', function () {
+            var mf = new IntlMessageFormat("<0/>");
+
+            var calls = [];
+            var printer = function () {
+                calls.push(arguments);
+                return "...";
+            };
+
+            var result = mf.format({0: printer});
+
+            expect(calls).to.have.length(1);
+            expect(calls[0][0]).to.be(undefined);
+            expect(result).to.equal("...");
+        });
+    });
+
+    describe('formatRaw', function () {
+        it('should properly replace direct arguments in the string', function () {
+            var mf = new IntlMessageFormat('My name is {FIRST} {LAST}.');
+            var output = mf.formatRaw({
+                FIRST: 'Anthony',
+                LAST : 'Pipkin'
+            });
+
+            expect(output).to.eql(['My name is ', 'Anthony', ' ', 'Pipkin', '.']);
+        });
+
+        it('should not ignore zero values', function() {
+            var mf = new IntlMessageFormat('I am {age} years old.');
+            var output = mf.formatRaw({
+                age: 0
+            });
+
+            expect(output).to.eql(['I am ', 0, ' years old.']);
+        });
+
+        it('should preserve objects', function() {
+            var mf = new IntlMessageFormat('My favorite thing is {object}');
+            var output = mf.formatRaw({
+                object: {
+                    type: "SHINY"
+                },
+            });
+
+            expect(output).to.eql(['My favorite thing is ', {type: "SHINY"}]);
+        });
+
+        it('should not ignore false, null, and undefined', function() {
+            var mf = new IntlMessageFormat('{a}{b}{c}');
+            var output = mf.formatRaw({
+                a: false,
+                b: null,
+                c: undefined
+            });
+
+            expect(output).to.eql([false, null, undefined]);
+        });
+
+        describe('tags', function () {
+            it('should insert tagElement function result', function () {
+                var mf = new IntlMessageFormat("<0>Hello</0> world");
+                var result = mf.formatRaw({
+                    0: function (content) {
+                        return {
+                            type: "div",
+                            children: content
+                        };
+                    }
+                });
+
+                expect(result).to.eql([
+                    {
+                        type: "div",
+                        children: ["Hello"]
+                    },
+                    " world"
+                ]);
+            });
+
+            it('should insert nested tag function results', function () {
+                var mf = new IntlMessageFormat("Please, <0>click <1>here</1></0>");
+                var result = mf.formatRaw({
+                    0: function (content) {
+                        return {
+                            type: "span",
+                            children: content
+                        };
+                    },
+                    1: function (content) {
+                        return {
+                            type: "a",
+                            props: {
+                                href: "/docs"
+                            },
+                            children: content
+                        };
+                    }
+                });
+
+                expect(result).to.eql([
+                  "Please, ",
+                  {
+                      type: "span",
+                      children: [
+                          "click ",
+                          {
+                              type: "a",
+                              props: {
+                                  href: "/docs",
+                              },
+                              children: ["here"]
+                          }
+                      ]
+                  }
+                ]);
+            });
         });
     });
 });

@@ -25,3 +25,25 @@ export function extend(obj) {
 
     return obj;
 }
+
+export function stringify(value) {
+  if (!value && typeof value !== 'number') {
+      return '';
+  }
+
+  return typeof value === 'string' ? value : String(value);
+}
+
+export function flatMap(arr, fn, result) {
+  for (var i = 0; i < arr.length; i++) {
+    var item = arr[i];
+
+    if (item instanceof Array) {
+      flatMap(item, fn, result);
+    } else {
+      result.push(fn(item));
+    }
+  }
+
+  return result;
+}

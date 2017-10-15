@@ -6,7 +6,7 @@ See the accompanying LICENSE file for terms.
 
 /* jslint esnext: true */
 
-import {extend, hop} from './utils';
+import {extend, hop, stringify, flatMap} from './utils';
 import {defineProperty, objCreate} from './es5';
 import Compiler from './compiler';
 import parser from 'intl-messageformat-parser';
@@ -40,20 +40,25 @@ function MessageFormat(message, locales, formats) {
     // "Bind" `format()` method to `this` so it can be passed by reference like
     // the other `Intl` APIs.
     var messageFormat = this;
-    this.format = function (values) {
-      try {
-        return messageFormat._format(pattern, values);
-      } catch (e) {
-        if (e.variableId) {
-          throw new Error(
-            'The intl string context variable \'' + e.variableId + '\'' +
-            ' was not provided to the string \'' + message + '\''
-          );
-        } else {
-          throw e;
-        }
-      }
-    };
+    this.format = withDecoratedError(this._format);
+    this.formatRaw = withDecoratedError(this._formatRaw);
+
+    function withDecoratedError(fn) {
+        return function (values) {
+            try {
+                return fn.call(messageFormat, pattern, values);
+            } catch (e) {
+                if (e.variableId) {
+                    throw new Error(
+                      'The intl string context variable \'' + e.variableId + '\'' +
+                      ' was not provided to the string \'' + message + '\''
+                    );
+                } else {
+                    throw e;
+                }
+            }
+        };
+    }
 }
 
 // Default format options used as the prototype of the `formats` provided to the
@@ -186,7 +191,11 @@ MessageFormat.prototype._findPluralRuleFunction = function (locale) {
 };
 
 MessageFormat.prototype._format = function (pattern, values) {
-    var result = '',
+    return flatMap(this._formatRaw(pattern, values), stringify, []).join("");
+};
+
+MessageFormat.prototype._formatRaw = function (pattern, values) {
+    var result = [],
         i, len, part, id, value, err;
 
     for (i = 0, len = pattern.length; i < len; i += 1) {
@@ -194,7 +203,7 @@ MessageFormat.prototype._format = function (pattern, values) {
 
         // Exist early for string parts.
         if (typeof part === 'string') {
-            result += part;
+            result.push(part);
             continue;
         }
 
@@ -213,9 +222,11 @@ MessageFormat.prototype._format = function (pattern, values) {
         // nested pattern structure. The choosing of the option to use is
         // abstracted-by and delegated-to the part helper object.
         if (part.options) {
-            result += this._format(part.getOption(value), values);
+            result.push(this._formatRaw(part.getOption(value), values));
+        } else if (part.pattern) {
+            result.push(part.format(value, this._formatRaw(part.pattern, values)));
         } else {
-            result += part.format(value);
+            result.push(part.format(value));
         }
     }
 

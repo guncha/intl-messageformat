@@ -33,7 +33,7 @@
     "./lib/locales.js": false
   },
   "dependencies": {
-    "intl-messageformat-parser": "1.2.0"
+    "intl-messageformat-parser": "github:guncha/intl-messageformat-parser#master-dist"
   },
   "devDependencies": {
     "benchmark": "^1.0.0",

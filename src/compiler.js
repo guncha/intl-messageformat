@@ -44,8 +44,16 @@ Compiler.prototype.compileMessage = function (ast) {
                 pattern.push(this.compileArgument(element));
                 break;
 
+            case 'tagElement':
+                pattern.push(this.compileTag(element));
+                break;
+
+            case 'selfClosingTagElement':
+                pattern.push(this.compileSelfClosingTag(element));
+                break;
+
             default:
-                throw new Error('Message element does not have a valid type');
+                throw new Error('Message element does not have a valid type: ' + element.type);
         }
     }
 
@@ -78,7 +86,7 @@ Compiler.prototype.compileArgument = function (element) {
     var format = element.format;
 
     if (!format) {
-        return new StringFormat(element.id);
+        return new RawFormat(element.id);
     }
 
     var formats  = this.formats,
@@ -149,18 +157,23 @@ Compiler.prototype.compileOptions = function (element) {
     return optionsHash;
 };
 
+Compiler.prototype.compileTag = function (element) {
+  return new TagFormat(element.name, this.compileMessage(element.value));
+};
+
+Compiler.prototype.compileSelfClosingTag = function (element) {
+  return new TagFormat(element.name);
+};
+
 // -- Compiler Helper Classes --------------------------------------------------
 
-function StringFormat(id) {
+// A format that simply returns the value unchanged
+function RawFormat(id) {
     this.id = id;
 }
 
-StringFormat.prototype.format = function (value) {
-    if (!value && typeof value !== 'number') {
-        return '';
-    }
-
-    return typeof value === 'string' ? value : String(value);
+RawFormat.prototype.format = function (value) {
+  return value;
 };
 
 function PluralFormat(id, useOrdinal, offset, options, pluralFn) {
@@ -203,4 +216,13 @@ function SelectFormat(id, options) {
 SelectFormat.prototype.getOption = function (value) {
     var options = this.options;
     return options[value] || options.other;
+};
+
+function TagFormat(id, pattern) {
+  this.id = id;
+  this.pattern = pattern;
+}
+
+TagFormat.prototype.format = function(value, content) {
+  return value(content);
 };
